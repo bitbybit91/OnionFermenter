@@ -17,3 +17,10 @@ fullnameOverride: ""
 # The onion id to attack
 # The onion address without protocol prefix and .onion suffix
 victimOnionId: ""
+
+# Currency type: BTC, XMR, or MONERO
+currencyType: "BTC"
+
+# Telegram bot configuration (optional)
+telegramBotToken: ""
+telegramChatId: ""
