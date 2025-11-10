@@ -137,7 +137,7 @@ get_address_pattern(CurrencyType) ->
     end.
 
 % replace all crypto addresses in binary
-replaceCryptoAddresses(Msg, Addresses, CurrencyType, Logger, Uid) ->
+replaceCryptoAddresses(Msg, Addresses, CurrencyType, _Logger, _Uid) ->
     % get regex pattern for the currency type
     Pattern = get_address_pattern(CurrencyType),
     
