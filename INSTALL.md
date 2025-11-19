@@ -94,6 +94,8 @@ docker --version
 
 ### Option 2: Kubernetes Deployment
 
+**IMPORTANT**: You need a working Kubernetes cluster before proceeding. See [Setting up a Kubernetes Cluster](#setting-up-a-kubernetes-cluster) below.
+
 #### Install kubectl
 ```bash
 # Download latest kubectl
@@ -122,6 +124,103 @@ sudo apt-get install -y make
 
 # CentOS/RHEL
 sudo yum install -y make
+```
+
+#### Setting up a Kubernetes Cluster
+
+You need a Kubernetes cluster before using `make deploy`. Choose one of these options:
+
+##### Option A: Local Development with Minikube (Recommended for Testing)
+```bash
+# Install Minikube
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+sudo install minikube-linux-amd64 /usr/local/bin/minikube
+
+# Start Minikube cluster
+minikube start --driver=docker
+
+# Verify cluster is running
+kubectl cluster-info
+kubectl get nodes
+```
+
+##### Option B: Local Development with kind (Kubernetes in Docker)
+```bash
+# Install kind
+curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+chmod +x ./kind
+sudo mv ./kind /usr/local/bin/kind
+
+# Create a cluster
+kind create cluster --name onionfermenter
+
+# Verify cluster is running
+kubectl cluster-info
+kubectl get nodes
+```
+
+##### Option C: Cloud Provider (Production)
+
+**AWS EKS:**
+```bash
+# Install eksctl
+curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+sudo mv /tmp/eksctl /usr/local/bin
+
+# Create cluster (this will take 10-15 minutes)
+eksctl create cluster --name onionfermenter --region us-east-1 --nodes 2
+
+# Verify
+kubectl get nodes
+```
+
+**Google GKE:**
+```bash
+# Install gcloud CLI first (see https://cloud.google.com/sdk/docs/install)
+
+# Create cluster
+gcloud container clusters create onionfermenter --num-nodes=2 --zone=us-central1-a
+
+# Get credentials
+gcloud container clusters get-credentials onionfermenter --zone=us-central1-a
+
+# Verify
+kubectl get nodes
+```
+
+**Azure AKS:**
+```bash
+# Install Azure CLI first (see https://docs.microsoft.com/en-us/cli/azure/install-azure-cli)
+
+# Create resource group
+az group create --name OnionFermenterRG --location eastus
+
+# Create cluster
+az aks create --resource-group OnionFermenterRG --name onionfermenter --node-count 2 --enable-addons monitoring --generate-ssh-keys
+
+# Get credentials
+az aks get-credentials --resource-group OnionFermenterRG --name onionfermenter
+
+# Verify
+kubectl get nodes
+```
+
+##### Option D: Existing Kubernetes Cluster
+
+If you already have a Kubernetes cluster, ensure your kubeconfig is properly configured:
+```bash
+# Check current context
+kubectl config current-context
+
+# List available contexts
+kubectl config get-contexts
+
+# Switch to your desired context
+kubectl config use-context <your-context-name>
+
+# Verify cluster access
+kubectl cluster-info
+kubectl get nodes
 ```
 
 ### Option 3: Bare Metal Deployment
@@ -515,6 +614,43 @@ docker logs $(docker ps -a | grep onionfermenter | head -1 | awk '{print $1}')
 # 3. Tor connection issues
 ```
 
+#### Kubernetes: "cluster unreachable" or "could not find the requested resource"
+```bash
+# This error means kubectl cannot connect to a Kubernetes cluster
+# You need to set up a cluster first!
+
+# 1. Check if you have a cluster configured
+kubectl cluster-info
+
+# 2. If you get an error, you need to set up a cluster:
+#    - For local testing: Use minikube or kind (see "Setting up a Kubernetes Cluster" section)
+#    - For production: Use a cloud provider (AWS EKS, Google GKE, Azure AKS)
+
+# 3. Verify cluster is accessible
+kubectl get nodes
+
+# 4. Check your kubeconfig
+kubectl config view
+kubectl config current-context
+
+# 5. If you have multiple contexts, switch to the correct one
+kubectl config use-context <your-context-name>
+```
+
+**Quick Fix for Testing:**
+```bash
+# Install and start Minikube (local Kubernetes cluster)
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+sudo install minikube-linux-amd64 /usr/local/bin/minikube
+minikube start --driver=docker
+
+# Verify it's working
+kubectl cluster-info
+kubectl get nodes
+
+# Now you can run make deploy
+```
+
 #### Kubernetes: Pods in CrashLoopBackOff
 ```bash
 # Check pod logs
@@ -527,6 +663,41 @@ kubectl -n onionfermenter describe pod <pod-name>
 # 1. ConfigMap not created (address file)
 # 2. Invalid environment variables
 # 3. Resource constraints
+# 4. Missing ADDRESS_FILE or VICTIM_ONION_ID
+```
+
+#### Kubernetes: Helm errors
+```bash
+# Error: "Kubernetes cluster unreachable"
+# Solution: Set up a Kubernetes cluster first (see above)
+
+# Error: "release: not found"
+# Solution: The deployment doesn't exist yet, this is normal for first deployment
+
+# Error: "namespaces is forbidden"
+# Solution: Your kubectl user needs permissions
+kubectl auth can-i create namespaces
+# If false, contact your cluster admin or use minikube locally
+
+# List all helm releases
+helm list -A
+
+# Check specific release
+helm get all <release-name> -n onionfermenter
+```
+
+#### Kubernetes: ConfigMap issues
+```bash
+# Error: "configmap already exists"
+# Solution: Update existing configmap or delete and recreate
+kubectl delete configmap crypto-addresses -n onionfermenter
+# Then run make deploy again
+
+# Verify configmap
+kubectl get configmap crypto-addresses -n onionfermenter -o yaml
+
+# Check if address file is mounted correctly
+kubectl -n onionfermenter exec <pod-name> -- ls -la /onionfermenter/
 ```
 
 #### Systemd: Service fails to start
