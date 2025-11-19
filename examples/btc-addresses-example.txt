@@ -1,0 +1,15 @@
+# Example Bitcoin (BTC) addresses
+# Add your own Bitcoin addresses here, one per line
+# Bitcoin addresses can be in various formats (Legacy, SegWit, Native SegWit)
+
+# Native SegWit (bc1) - 42-62 characters
+bc1qtt04zfgjxg7lpqhk9vk8hnmnwf88ucwww5arsd
+bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh
+
+# Legacy (1) - 26-35 characters
+1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa
+1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2
+
+# SegWit (3) - 26-35 characters
+3J98t1WpEZ73CNmYviecrnyiWrnqRhWNLy
+3FkenCiXpSLqD8L79intRNXUgjRoH9sjXa

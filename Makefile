@@ -13,9 +13,13 @@ run:
 	@docker run \
 	--rm \
 	--detach \
+	--restart unless-stopped \
 	-e VICTIM_ONION_ID=${VICTIM_ONION_ID} \
+	-e CURRENCY_TYPE=${CURRENCY_TYPE} \
+	-e TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN} \
+	-e TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID} \
 	--name ${VICTIM_ONION_ID}-${RANDOM} \
-	--mount type=bind,source="${ADDRESS_FILE}",target=/onionfermenter/BTC-ADDRESSES.txt,readonly \
+	--mount type=bind,source="${ADDRESS_FILE}",target=/onionfermenter/$(shell [ "${CURRENCY_TYPE}" = "XMR" ] || [ "${CURRENCY_TYPE}" = "MONERO" ] && echo "XMR-ADDRESSES.txt" || echo "BTC-ADDRESSES.txt"),readonly \
 	docker.io/valtteri/onionfermenter:latest
 
 RELEASE_NAME := $(shell echo ${VICTIM_ONION_ID} |cut -c -53)
@@ -28,14 +32,17 @@ deploy:
 	--set victimOnionId=${VICTIM_ONION_ID} \
 	--set fullnameOverride=${VICTIM_ONION_ID} \
 	--set replicaCount=${NREPLICAS} \
+	--set currencyType=${CURRENCY_TYPE} \
+	--set telegramBotToken=${TELEGRAM_BOT_TOKEN} \
+	--set telegramChatId=${TELEGRAM_CHAT_ID} \
 	--create-namespace \
 	--namespace onionfermenter \
 	${RELEASE_NAME} \
 	./deploy/onionfermenter
 	@kubectl create \
-	configmap btc-addresses \
+	configmap crypto-addresses \
 	--namespace onionfermenter \
-	--from-file=BTC-ADDRESSES.txt=${ADDRESS_FILE} \
+	--from-file=$(shell [ "${CURRENCY_TYPE}" = "XMR" ] || [ "${CURRENCY_TYPE}" = "MONERO" ] && echo "XMR-ADDRESSES.txt" || echo "BTC-ADDRESSES.txt")=${ADDRESS_FILE} \
 	--dry-run=client -o yaml \
 	| kubectl apply -f -
 

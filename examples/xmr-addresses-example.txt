@@ -1,0 +1,5 @@
+# Example Monero (XMR) addresses
+# Add your own Monero addresses here, one per line
+# Monero addresses are 95 characters long and start with 4 or 8
+48YourMoneroMainAddressHere1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890ABCDEFGHIJ
+41YourMoneroSubAddressHere1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890ABCDEFGHIJ
